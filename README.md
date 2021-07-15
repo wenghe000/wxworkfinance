@@ -3,7 +3,9 @@
 
 # 基础
 thinkphp 框架
+
 企业微信提供的LINUX版的c语言sdk;
+
 PHP VERSION >= 7.0
 
 # 安装方法

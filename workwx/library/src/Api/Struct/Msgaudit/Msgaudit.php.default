@@ -1,0 +1,96 @@
+<?php
+
+
+class Msgaudit
+{
+
+    /**
+     * Msgaudit constructor.
+     * @param null $corpId
+     * @param null $secret
+     * @param null $privateKey
+     */
+    public function call($corpId = null, $secret = null, $privateKey = null)
+    {
+        $this->corpId = $corpId;
+        $this->secret = $secret;
+        $this->privateKey = $privateKey;
+        $this->obj = new WxworkFinanceSdk($this->corpId, $this->secret, [
+            "timeout" => -2,
+        ]);
+    }
+
+
+    public function getChatData($seq = 0, $limit = 100)
+    {
+        $chats = json_decode($this->obj->getChatData($seq, $limit), true);
+        $dir = __DIR__ . '/../../../../../../../public/uploads/workwx/';
+        $list = [];
+        foreach ($chats['chatdata'] as $val) {
+            try {
+                $decryptRandKey = null;
+                openssl_private_decrypt(base64_decode($val['encrypt_random_key']), $decryptRandKey, $this->privateKey, OPENSSL_PKCS1_PADDING);
+                $result = $this->obj->decryptData($decryptRandKey, $val['encrypt_chat_msg']);
+                $result = json_decode($result, true);
+                $result['seq'] = $val['seq'];
+                if (empty($result['msgtype'])) {
+                    //切换日志
+                    $list[] = $result;
+                    continue;
+                }
+                $md5_time = md5(time());
+                switch ($result['msgtype']) {
+                    case 'image':
+                        // 图片
+                        $sdkFileId = $result['image']["sdkfileid"];
+                        $result['image']['url'] = '/uploads/workwx/image/' . $md5_time . '.png';
+                        $filename = $dir . 'image/' . $md5_time . '.png';
+                        $this->obj->downloadMedia($sdkFileId, $filename);
+                        break;
+                    case 'voice':
+                        // 声音
+                        $sdkFileId = $result['voice']["sdkfileid"];
+                        $result['voice']['url'] = '/uploads/workwx/voice/' . $md5_time . '.mp3';
+                        $filename = $dir . 'voice/' . $md5_time . '.mp3';
+                        $this->obj->downloadMedia($sdkFileId, $filename);
+                        break;
+                    case 'video':
+                        // 视频
+                        $sdkFileId = $result['video']["sdkfileid"];
+                        $result['video']['url'] = '/uploads/workwx/video/' . $md5_time . '.mp4';
+                        $filename = $dir . 'video/' . $md5_time . '.mp4';
+                        $this->obj->downloadMedia($sdkFileId, $filename);
+                        break;
+                    case 'file':
+                        // 文件
+                        $sdkFileId = $result['file']["sdkfileid"];
+                        $result['file']['url'] = '/uploads/workwx/file/' . $md5_time . '.' . $result['file']['fileext'];
+                        $filename = $dir . 'file/' . $md5_time . '.' . $result['file']['fileext'];
+                        $this->obj->downloadMedia($sdkFileId, $filename);
+                        break;
+                    default:
+                        break;
+                }
+                $list[] = $result;
+            } catch (Exception $e) {
+                $path = __DIR__ . '/../../../../../../../runtime/log/workwx/'.date('Ym');
+                if(!is_dir($path)){
+                    $flag = mkdir($path,0777,true);
+                }
+                $ERR_LOG_FILE = $path .'/'.date('d').'.log';
+                $msg = '['.date('Ymd H:i:s').'] '.$val['seq'].': ';
+                $msg .= $e->getMessage()."\r\n";
+                file_put_contents($ERR_LOG_FILE, $msg , FILE_APPEND);
+                file_put_contents($ERR_LOG_FILE, $val['seq'].': '.json_encode($result)."\r\n" , FILE_APPEND);
+                file_put_contents($ERR_LOG_FILE, $e->__toString()."\r\n\r\n" , FILE_APPEND);
+                //echo $e->__toString(); //把错误消息转换为字符串形式
+            }
+        }
+        return $list;
+    }
+
+}
+
+$msgaudit = new Msgaudit();
+return $msgaudit;
+

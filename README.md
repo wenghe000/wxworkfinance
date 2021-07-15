@@ -21,6 +21,7 @@ make && make install
 3,编辑PHP.ini
 编辑php.ini，添加extension = wxwork_finance_sdk.so扩展
 ![Image text](https://github.com/wenghe000/wxworkfinance/raw/main/phpini.png)
+
 4, 重启php服务，在phpinfo里面能看到wxworkfinance扩展表示安装扩展成功
 
 # 使用方法
